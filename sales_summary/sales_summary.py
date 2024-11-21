@@ -13,6 +13,8 @@ import time
 @task(log_prints=True)
 def set_orchestration_parameters(extract_mode: str, api_range_start_hardcoded: str, relative_days: int):
 
+    today = datetime.now()
+
     api_range_start_relative = (today - timedelta(days=relative_days)).strftime("%Y%m%d")
     api_range_end = today.strftime("%Y%m%d")
 
