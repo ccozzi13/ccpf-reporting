@@ -36,7 +36,7 @@ def get_toast_access_token(toastAPIHost):
     
     secret_block = Secret.load("analytics-creds")
 
-    creds = json.load(secret_block)
+    creds = json.load(secret_block.get())
 
     ToastUserId = creds['toastAnalyticsAPIUserProd']
     ToastSecret = creds['toastAnalyticsAPISecretProd']
