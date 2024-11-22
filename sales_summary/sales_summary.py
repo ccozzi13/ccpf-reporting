@@ -1,8 +1,9 @@
+from prefect.blocks.system import Secret
 from prefect import flow, task
 from datetime import datetime, timedelta
 import calendar
 
-#import pandas as pd
+import pandas as pd
 import glob
 import re
 
@@ -30,11 +31,48 @@ def set_orchestration_parameters(extract_mode: str, api_range_start_hardcoded: s
     
     return api_range_start, api_range_end
 
-@flow
+@task(log_prints=True)
+def get_toast_access_token(toastAPIHost):
+    
+    secret_block = Secret.load("analytics-creds")
+
+    creds = json.load(secret_block)
+
+    ToastUserId = creds['toastAnalyticsAPIUserProd']
+    ToastSecret = creds['toastAnalyticsAPISecretProd']
+
+    auth_url = f"{toastAPIHost}/authentication/v1/authentication/login"
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "clientId": ToastUserId,
+        "clientSecret": ToastSecret,
+        "userAccessType": "TOAST_MACHINE_CLIENT"
+    }
+
+    response = requests.post(auth_url, headers=headers, data=json.dumps(payload))
+    response.raise_for_status()
+
+    toastAccessToken = response.json()['token']['accessToken']
+    toastAccessStatus = response.json()['status']
+  
+    print("Authentication Status: "+toastAccessStatus)
+
+    return toastAccessToken
+
+@flow(log_prints=True)
 def create_sales_summary(extract_mode: str, api_range_start_hardcoded: str, relative_days: int, request_sleep_time: int):
+    print("---------Setting Orchestration Paramenters---------")
     api_range_start, api_range_end = set_orchestration_parameters(extract_mode, api_range_start_hardcoded, relative_days)
-    print(api_range_start)
-    print(api_range_end)
+
+    print("---------Authenticating to Toast---------")
+    toastAPIHost = 'https://ws-api.toasttab.com'
+    toastAccessToken = get_toast_access_token(toastAPIHost)
+
+    print("---------Setting Orchestration Paramenters---------")
 
 if __name__ == "__main__":
     flow.from_source(
