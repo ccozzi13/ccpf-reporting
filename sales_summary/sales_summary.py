@@ -43,5 +43,6 @@ if __name__ == "__main__":
     ).deploy(
         name="sales-summary-reporting", 
         work_pool_name="TestPool", 
-        parameters={"extract_mode": "Relative", "api_range_start_hardcoded": "20240101", "relative_days": 1, "request_sleep_time": 8}
+        parameters={"extract_mode": "Relative", "api_range_start_hardcoded": "20240101", "relative_days": 1, "request_sleep_time": 8},
+        job_variables={"pip_packages": ["pandas"]}
     )
