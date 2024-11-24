@@ -63,16 +63,76 @@ def get_toast_access_token(toastAPIHost):
 
     return toastAccessToken
 
+@task(log_prints=True)
+def post_report_request(toastAPIHost, toastAccessToken, report_start_date, Locations):
+    report_request_url = f"{toastAPIHost}/era/v1/menu/day"
+
+    headers = {
+        "Authorization": f"Bearer {toastAccessToken}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+          "restaurantIds": [Locations[0], Locations[1], Locations[2]],
+          "excludedRestaurantIds": [],
+          "startBusinessDate": report_start_date,
+          "groupBy": ["MENU"]
+    }
+
+    response = requests.post(report_request_url, headers=headers, data=json.dumps(payload))
+    response.raise_for_status()
+
+    reportGUID = response.json()
+
+    return reportGUID
+
+@task(log_prints=True)
+def get_report_results(toastAPIHost, toastAccessToken, reportGUID):
+    report_retrieve_url = f"{toastAPIHost}/era/v1/menu/{reportGUID}"
+
+    headers = {
+        "Authorization": f"Bearer {toastAccessToken}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.get(report_retrieve_url, headers=headers)
+    response.raise_for_status()
+
+    return response.json()
+
 @flow(log_prints=True)
 def create_sales_summary(extract_mode: str, api_range_start_hardcoded: str, relative_days: int, request_sleep_time: int):
-    print("---------Setting Orchestration Paramenters---------")
+
+    #Location Details
+    Location_SahadiSpirits = "03ab87dc-a410-414f-b6f6-edacdbed27ad"
+    Location_SahadiIC = "962f0037-3c2a-4126-84d6-9d18ee7e1c35"
+    Location_SahadiAA = "fbddfd44-5ab0-4761-95ef-a1bd1c6996f5"
+    Locations = [Location_SahadiSpirits, Location_SahadiIC, Location_SahadiAA]
+    LocationNames = ["Sahadi Spirits", "Sahadi's - Industry City", "Sahadi's - Atlantic Avenue"]
+
+    print("---------Setting Orchestration Parameters---------")
     api_range_start, api_range_end = set_orchestration_parameters(extract_mode, api_range_start_hardcoded, relative_days)
 
     print("---------Authenticating to Toast---------")
     toastAPIHost = 'https://ws-api.toasttab.com'
     toastAccessToken = get_toast_access_token(toastAPIHost)
 
-    print("---------Setting Orchestration Paramenters---------")
+    print("---------Pull New Reporting Data---------")
+    report_date = api_range_start
+    while report_date <= api_range_end:
+        print("Requesting: " + report_date)
+        reportGUID = post_report_request(toastAPIHost, toastAccessToken, report_date, Locations)
+        time.sleep(request_sleep_time)
+
+        print("Retrieving: " + report_date + " with GUID " + reportGUID)
+        daily_date_json = get_report_results(toastAPIHost, toastAccessToken, reportGUID)
+
+        print("Exporting: " + report_date)
+        print(daily_date_json)
+        #save_daily_data(daily_date_json, WorkingPath, CustomerName + "_Daily_" + report_date)
+
+        report_date = (datetime.strptime(report_date, "%Y%m%d") + timedelta(days=1)).strftime("%Y%m%d")
+    print("Reporting requests complete!")
 
 if __name__ == "__main__":
     flow.from_source(
